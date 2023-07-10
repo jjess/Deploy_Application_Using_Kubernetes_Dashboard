@@ -49,6 +49,8 @@ metadata:
   name: wordpress-deployment
 spec: # specification for deployment resource
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: wordpress
@@ -80,6 +82,11 @@ spec: # specification for deployment resource
         volumeMounts:
         - name: wordpress-nfs-pv
           mountPath: /var/www/html
+      livenessProbe:
+        tcpSocket:
+          port: 3306
+        initialDelaySeconds: 120
+        periodSeconds: 20
       volumes:
       - name: wordpress-nfs-pv
         persistentVolumeClaim:
