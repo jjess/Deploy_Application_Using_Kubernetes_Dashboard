@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wordpress-nfs-pv-claim
+  labels:
+    app: wordpress
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 300Mi
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: wordpress-nfs-pv
+  labels:
+spec:
+  persistentVolumeReclaimPolicy: Delete
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteMany
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /data/nfs3/wordpress_data
+    server: 192.168.56.105 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+spec:
+  selector:
+    app: wordpress
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP #default
+      nodePort: 31000
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress-deployment
+spec: # specification for deployment resource
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template: # blueprint for Pod
+    metadata:
+      labels:
+        app: wordpress
+    spec: # specification for Pod
+      containers:
+      - name: wordpress
+        image: wordpress:latest 
+        ports:
+        - containerPort: 80
+        env:
+        - name: WORDPRESS_DB_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: mariadb-configmap
+              key: database_url
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mariadb-secret
+              key: mariadb-root-password
+        - name: WORDPRESS_DB_USER
+          value: root
+        - name: WORDPRESS_DEBUG
+          value: "1"
+        volumeMounts:
+        - name: wordpress-nfs-pv
+          mountPath: /var/www/html
+      volumes:
+      - name: wordpress-nfs-pv
+        persistentVolumeClaim:
+          claimName: wordpress-nfs-pv-claim
